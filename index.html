@@ -232,6 +232,16 @@ var SENSITIVE_RULES = [
 var currentUser = null;
 
 // DeepSeek default configuration
+function getApiFetchUrl(baseUrl) {
+  // When running locally, API calls need CORS proxy via the local server
+  var host = window.location.hostname;
+  var proto = window.location.protocol;
+  if (host === 'localhost' || host === '127.0.0.1' || proto === 'file:') {
+    return '/api/proxy?url=' + encodeURIComponent(baseUrl);
+  }
+  return baseUrl;
+}
+
 var DEEPSEEK_DEFAULT = {
   url: 'https://api.deepseek.com/v1/chat/completions',
   key: 'sk-df99ce5a57dd4921b101e69db8e6f163',
@@ -540,7 +550,7 @@ function doAIScriptReview(text, localResult) {
   var btn = document.getElementById('reviewBtn');
   btn.innerHTML = '<span class="loading"></span> AI 深度审核中...';
   
-  fetch(config.url, {
+  fetch(getApiFetchUrl(config.url), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.key },
     body: JSON.stringify({ model: config.model || DEEPSEEK_DEFAULT.model, messages: [{role:'user', content: reviewPrompt}], max_tokens: 2048, temperature: 0.1 })
@@ -646,7 +656,7 @@ function testApi() {
   if (!btn) return;
   btn.disabled = true;
   btn.textContent = '测试中...';
-  fetch(config.url, {
+  fetch(getApiFetchUrl(config.url), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.key },
     body: JSON.stringify({ model: config.model, messages: [{role:'user', content:'回复"ok"表示连接正常'}], max_tokens: 10 })
@@ -713,7 +723,7 @@ function doPolish() {
       {role: 'system', content: config.prompt},
       {role: 'user', content: '请用【' + modeName + '】的风格润色以下内容：\n\n' + text}
     ];
-    fetch(config.url, {
+    fetch(getApiFetchUrl(config.url), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.key },
       body: JSON.stringify({ model: config.model, messages: messages, max_tokens: 2048, temperature: 0.7 })
