@@ -230,6 +230,13 @@ var SENSITIVE_RULES = [
 
 var currentUser = null;
 
+// DeepSeek default configuration
+var DEEPSEEK_DEFAULT = {
+  url: 'https://api.deepseek.com/v1/chat/completions',
+  key: 'sk-df99ce5a57dd4921b101e69db8e6f163',
+  model: 'deepseek-chat'
+};
+
 function showToast(msg, duration) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -480,26 +487,26 @@ function loadApiConfig() {
     var saved = localStorage.getItem('ai_config');
     if (saved) {
       var config = JSON.parse(saved);
-      document.getElementById('apiUrl').value = config.url || '';
-      document.getElementById('apiKey').value = config.key || '';
+      document.getElementById('apiUrl').value = config.url || DEEPSEEK_DEFAULT.url;
+      document.getElementById('apiKey').value = config.key || DEEPSEEK_DEFAULT.key;
       var sel = document.getElementById('apiModel');
       var custom = document.getElementById('apiModelCustom');
       var found = false;
       for (var i = 0; i < sel.options.length; i++) {
-        if (sel.options[i].value === config.model) { sel.value = config.model; custom.style.display = 'none'; found = true; break; }
+        if (sel.options[i].value === (config.model || DEEPSEEK_DEFAULT.model)) { sel.value = config.model; custom.style.display = 'none'; found = true; break; }
       }
-      if (!found) { sel.value = ''; custom.value = config.model; custom.style.display = 'block'; }
+      if (!found) { sel.value = ''; custom.value = config.model || DEEPSEEK_DEFAULT.model; custom.style.display = 'block'; }
       if (config.prompt) document.getElementById('apiPrompt').value = config.prompt;
       updateApiStatus(true);
       return true;
     }
   } catch(e) { }
-  // Default to DeepSeek if no saved config
-  var defaultConfig = { url: 'https://api.deepseek.com/v1/chat/completions', key: 'sk-df99ce5a57dd4921b101e69db8e6f163', model: 'deepseek-chat', prompt: '' };
-  localStorage.setItem('ai_config', JSON.stringify(defaultConfig));
-  document.getElementById('apiUrl').value = defaultConfig.url;
-  document.getElementById('apiKey').value = defaultConfig.key;
-  document.getElementById('apiModel').value = 'deepseek-chat';
+  // Pre-fill DeepSeek defaults
+  document.getElementById('apiUrl').value = DEEPSEEK_DEFAULT.url;
+  document.getElementById('apiKey').value = DEEPSEEK_DEFAULT.key;
+  document.getElementById('apiModel').value = DEEPSEEK_DEFAULT.model;
+  // Auto-save silently
+  try { localStorage.setItem('ai_config', JSON.stringify({ url: DEEPSEEK_DEFAULT.url, key: DEEPSEEK_DEFAULT.key, model: DEEPSEEK_DEFAULT.model, prompt: '' })); } catch(e){}
   updateApiStatus(true);
   return true;
 }
@@ -517,7 +524,10 @@ function updateApiStatus(configured) {
 function testApi() {
   var config = getApiConfig();
   if (!config) return;
-  var btn = event.target;
+  var btns = document.querySelectorAll('button');
+  var btn = null;
+  for (var bi = 0; bi < btns.length; bi++) { if (btns[bi].textContent.indexOf('测试连接') >= 0) { btn = btns[bi]; break; } }
+  if (!btn) return;
   btn.disabled = true;
   btn.textContent = '测试中...';
   fetch(config.url, {
@@ -526,7 +536,7 @@ function testApi() {
     body: JSON.stringify({ model: config.model, messages: [{role:'user', content:'回复"ok"表示连接正常'}], max_tokens: 10 })
   })
   .then(function(rsp){
-    if (!rsp.ok) throw new Error('HTTP ' + rsp.status);
+    if (!rsp.ok) throw new Error('HTTP ' + rsp.status + '，URL: ' + config.url);
     return rsp.json();
   })
   .then(function(){
@@ -547,11 +557,17 @@ function getApiConfig() {
   var key = document.getElementById('apiKey').value.trim();
   var model = document.getElementById('apiModel').value || document.getElementById('apiModelCustom').value.trim();
   var prompt = document.getElementById('apiPrompt').value.trim();
+  // Fallback to DeepSeek defaults if inputs are empty
+  if (!url) { url = DEEPSEEK_DEFAULT.url; document.getElementById('apiUrl').value = url; }
+  if (!key) { key = DEEPSEEK_DEFAULT.key; document.getElementById('apiKey').value = key; }
+  if (!model) { model = DEEPSEEK_DEFAULT.model; document.getElementById('apiModel').value = model; }
   if (!url) { showToast('⚠️ 请先配置API地址'); return null; }
   if (!key) { showToast('⚠️ 请先配置API Key'); return null; }
   if (!model) { showToast('⚠️ 请选择模型'); return null; }
   try { var saved = JSON.parse(localStorage.getItem('ai_config')); if (saved && saved.prompt && !prompt) prompt = saved.prompt; } catch(e){}
   if (!prompt) prompt = document.getElementById('apiPrompt').value.trim();
+  // Auto-save if not saved
+  try { if (!localStorage.getItem('ai_config')) { localStorage.setItem('ai_config', JSON.stringify({ url: url, key: key, model: model, prompt: prompt })); updateApiStatus(true); } } catch(e){}
   return { url: url, key: key, model: model, prompt: prompt };
 }
 
@@ -579,7 +595,7 @@ function doPolish() {
     .then(function(rsp){
       if (rsp.status === 401 || rsp.status === 403) throw new Error('认证失败，请检查API Key');
       if (rsp.status === 429) throw new Error('请求过于频繁，请稍后再试');
-      if (!rsp.ok) throw new Error('HTTP ' + rsp.status);
+      if (!rsp.ok) throw new Error('HTTP ' + rsp.status + ' - 请检查API地址和Key是否正确');
       return rsp.json();
     })
     .then(function(data){
