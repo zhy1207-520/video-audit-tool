@@ -1,0 +1,618 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>视频号脚本审核 + AI 润色</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f0f0f0;color:#333;padding-bottom:80px}
+.header{background:linear-gradient(135deg,#07c160,#06ad56);color:#fff;padding:14px 20px;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:100}
+.header .sub{font-size:12px;font-weight:400;opacity:0.85}
+.body{padding:14px;max-width:860px;margin:0 auto}
+.card{background:#fff;border-radius:10px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.title{font-size:15px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+textarea{width:100%;min-height:120px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;font-family:inherit;resize:vertical;line-height:1.6}
+textarea:focus{border-color:#07c160}
+.hint{font-size:12px;color:#999;margin-top:4px;display:flex;justify-content:space-between}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:9px 18px;border:none;border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-primary{background:#07c160;color:#fff}
+.btn-primary:hover{background:#06ad56}
+.btn-primary:disabled{background:#ccc;cursor:not-allowed}
+.btn-outline{background:transparent;border:1px solid #07c160;color:#07c160}
+.btn-outline:hover{background:#f0faf4}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn-block{width:100%;justify-content:center;font-size:15px;padding:12px}
+.tabs{display:flex;gap:0;margin-bottom:12px;background:#fff;border-radius:10px;overflow:hidden;position:sticky;top:52px;z-index:99}
+.tab{flex:1;padding:10px;text-align:center;border:none;background:#fff;font-size:13px;font-weight:500;color:#666;cursor:pointer;position:relative;transition:all .2s}
+.tab.active{color:#07c160;font-weight:600}
+.tab.active::after{content:"";display:block;height:3px;background:#07c160;border-radius:3px 3px 0 0;margin-top:6px}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.result-item{padding:10px 14px;margin-bottom:6px;border-radius:8px;border-left:4px solid;font-size:13px}
+.result-item.high{border-color:#fa5151;background:#fff5f5}
+.result-item.medium{border-color:#fa9a3b;background:#fffaf0}
+.result-item.low{border-color:#5865f2;background:#f0f2ff}
+.preview-box{border:1px solid #e8e8e8;border-radius:8px;padding:12px;font-size:14px;line-height:1.7;white-space:pre-wrap;background:#fafafa;max-height:300px;overflow-y:auto}
+.suggest-item{padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;display:flex;gap:8px}
+.suggest-item:last-child{border-bottom:none}
+.suggest-num{width:20px;height:20px;border-radius:50%;background:#07c160;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.suggest-fix{color:#07c160;font-size:12px;margin-top:2px}
+.opt-box{border:1px solid #07c160;border-radius:8px;padding:12px;font-size:14px;line-height:1.7;white-space:pre-wrap;background:#f0faf4;min-height:60px}
+.compare-box{display:flex;gap:12px;min-height:100px}
+.compare-box > div{flex:1;min-width:0}
+.compare-label{font-size:12px;color:#999;margin-bottom:4px}
+.toast{display:none;position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;z-index:999;max-width:80vw;text-align:center;pointer-events:none}
+.toast.show{display:block;animation:fadeInOut 2.5s ease}
+@keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(-10px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}85%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+.category-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+.category-tag.politics{background:#ffe0e0;color:#d63031}
+.category-tag.sexual{background:#ffd6e0;color:#c0392b}
+.category-tag.violence{background:#ffcccc;color:#b71c1c}
+.category-tag.misinfo{background:#fff3cd;color:#856404}
+.category-tag.clickbait{background:#ffe0b2;color:#e65100}
+.category-tag.other{background:#f5f5f5;color:#616161}
+.api-config{background:#f8fff9;border:1px solid #07c160;border-radius:8px;padding:14px;margin-bottom:12px;font-size:13px}
+.api-config summary{cursor:pointer;color:#07c160;font-weight:500;padding:4px 0}
+.api-config label{display:block;margin-top:8px;font-size:12px;color:#666}
+.api-config input{width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px;outline:none}
+.api-config input:focus{border-color:#07c160}
+.api-config select{width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px}
+.api-status{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.api-status.on{background:#07c160}
+.api-status.off{background:#ccc}
+.polish-modes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.polish-mode{padding:6px 14px;border:1px solid #ddd;background:#fff;border-radius:16px;cursor:pointer;font-size:12px;transition:all .2s;user-select:none}
+.polish-mode.active{border-color:#07c160;background:#f0faf4;color:#07c160;font-weight:500}
+.loading{display:inline-block;width:16px;height:16px;border:2px solid rgba(7,193,96,0.2);border-top-color:#07c160;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.user-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#fff;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);font-size:13px}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:#07c160;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0}
+.user-name{flex:1;font-weight:500}
+.user-logout{font-size:12px;color:#999;cursor:pointer;padding:4px 8px;border-radius:6px}
+.user-logout:hover{background:#f5f5f5;color:#fa5151}
+.login-btn{display:flex;align-items:center;gap:8px;padding:10px 20px;background:#07c160;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;width:100%;justify-content:center;margin:20px 0}
+.login-btn:hover{background:#06ad56}
+.login-hint{text-align:center;font-size:12px;color:#999;margin-top:8px}
+.score-bar{display:flex;gap:4px;margin:8px 0;align-items:center}
+.score-bar .label{font-size:12px;color:#666;width:50px}
+.score-bar .track{flex:1;height:6px;background:#eee;border-radius:3px;overflow:hidden}
+.score-bar .fill{height:100%;border-radius:3px;transition:width .4s}
+.score-bar .fill.good{background:#07c160}
+.score-bar .fill.ok{background:#fa9a3b}
+.score-bar .fill.bad{background:#fa5151}
+.score-bar .num{font-size:12px;color:#666;width:30px;text-align:right}
+.login-box{text-align:center;padding:30px 20px}
+.login-box .icon-big{font-size:48px;margin-bottom:12px}
+.login-box p{font-size:13px;color:#999;margin-bottom:20px}
+.login-box .note{font-size:11px;color:#ccc;margin-top:12px}
+@media(max-width:600px){.compare-box{flex-direction:column}.body{padding:10px}}
+</style>
+</head>
+<body>
+<div class="header">
+  &#x1F4F1; 视频号脚本审核 + AI 润色
+  <span class="sub" id="apiStatus"><span class="api-status off"></span>未配置AI</span>
+</div>
+
+<div id="userBar" class="user-bar" style="display:none">
+  <div class="user-avatar" id="userAvatar">V</div>
+  <div class="user-name" id="userName">视频号用户</div>
+  <span class="user-logout" onclick="logout()">退出</span>
+</div>
+
+<div class="body" id="appBody">
+  <div id="loginScreen">
+    <div class="card login-box">
+      <div class="icon-big">&#x1F3AC;</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:6px">欢迎使用视频号助手</div>
+      <p>登录后可进行脚本审核、AI润色等操作</p>
+      <button class="login-btn" onclick="doLogin()">
+        <span class="icon">&#x1F4F1;</span> 微信一键登录（模拟）
+      </button>
+      <div class="note">点击按钮即可登录，无需扫码</div>
+    </div>
+  </div>
+
+  <div id="mainApp" style="display:none">
+    <div class="tabs">
+      <button class="tab active" data-tab="0">&#x1F4DD; 脚本审核</button>
+      <button class="tab" data-tab="1">&#x2728; AI 润色</button>
+    </div>
+
+    <div class="tab-content active" id="tab0">
+      <div class="card">
+        <div class="title">&#x1F4C4; 填写脚本内容</div>
+        <textarea id="content" placeholder="请输入你的视频脚本文案，系统将根据《微信视频号运营规范》进行智能审核..."></textarea>
+        <div class="hint"><span id="count">0 字符</span><span>建议 200-800 字符</span></div>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-block" id="reviewBtn" onclick="doReview()">&#x1F50D; 开始审核</button>
+          <button class="btn btn-outline btn-block" onclick="clearContent()">&#x1F5D1; 清空</button>
+        </div>
+      </div>
+      <div id="results" style="display:none"></div>
+    </div>
+
+    <div class="tab-content" id="tab1">
+      <details class="api-config" id="apiConfig">
+        <summary><span id="apiDot"><span class="api-status off"></span></span> AI 接口配置 <span style="font-weight:400;color:#999;font-size:12px">（支持 OpenAI / DeepSeek / 通义千问 等兼容接口）</span></summary>
+        <label>API 地址</label>
+        <input id="apiUrl" placeholder="https://api.deepseek.com/v1/chat/completions">
+        <label>API Key</label>
+        <input id="apiKey" type="password" placeholder="sk-...">
+        <label>模型名称</label>
+        <select id="apiModel" onchange="toggleModelCustom()">
+          <option value="">自定义输入</option>
+          <option value="gpt-4o-mini">GPT-4o-mini</option>
+          <option value="gpt-4o">GPT-4o</option>
+          <option value="deepseek-chat" selected>DeepSeek Chat</option>
+          <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+          <option value="qwen-plus">通义千问 Plus</option>
+        </select>
+        <input id="apiModelCustom" placeholder="输入自定义模型名" style="display:none;margin-top:4px">
+        <label style="margin-top:8px;font-size:11px;color:#999">自定义提示词 <button class="btn btn-sm btn-outline" onclick="resetPrompt()" style="float:right;padding:2px 8px">恢复默认</button></label>
+        <textarea id="apiPrompt" rows="3" style="min-height:60px;font-size:12px">你是一个专业的视频号脚本优化助手。请对用户提供的视频脚本进行润色优化，要求：1. 保留原意和信息完整性；2. 优化表达使其更吸引人、更流畅；3. 避免标题党、虚假夸大等违规内容；4. 适合短视频口播风格。请直接输出优化后的完整脚本，不要添加解释。</textarea>
+        <div class="btn-group" style="margin-top:8px">
+          <button class="btn btn-sm btn-primary" onclick="saveApiConfig()">&#x1F4BE; 保存配置</button>
+          <button class="btn btn-sm btn-outline" onclick="testApi()">&#x1F50C; 测试连接</button>
+        </div>
+      </details>
+
+      <div class="card">
+        <div class="title">&#x2728; AI 智能润色</div>
+        <div class="polish-modes" id="polishModes">
+          <span class="polish-mode active" data-prompt="请对以下视频脚本进行润色，使其更正式、专业，适合知识科普类视频。保留原意，优化句式结构，使用更规范的书面语。">&#x1F4F0; 正式</span>
+          <span class="polish-mode" data-prompt="请对以下视频脚本进行润色，使其更简洁明了，去掉冗余词汇，保留核心信息。适合快节奏短视频。">&#x2702; 简洁</span>
+          <span class="polish-mode" data-prompt="请对以下视频脚本进行润色，使其更生动有趣，增强画面感和感染力。使用更丰富的修辞和表达。适合娱乐/生活类视频。">&#x1F3A8; 生动</span>
+          <span class="polish-mode" data-prompt="请对以下视频脚本进行润色，使其更像朋友间聊天，口语化、接地气，有互动感。适合直播/口播视频。">&#x1F4AC; 口语</span>
+          <span class="polish-mode" data-prompt="请为以下内容生成一个吸引人但不夸张的视频标题（15字以内），以及一段简洁的开场白（50字以内）。标题要有吸引力但不标题党。">&#x1F3F7; 标题</span>
+        </div>
+        <textarea id="polishInput" placeholder="输入需要润色的文本，或从审核区导入..." rows="5"></textarea>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-block" id="polishBtn" onclick="doPolish()">&#x2728; AI 润色</button>
+          <button class="btn btn-outline" onclick="importFromReview()">&#x1F4E5; 从审核区导入</button>
+        </div>
+      </div>
+
+      <div id="polishResults" style="display:none">
+        <div class="card">
+          <div class="title">&#x1F4CA; 润色对比</div>
+          <div class="compare-box">
+            <div>
+              <div class="compare-label">&#x1F4DD; 原文</div>
+              <div class="preview-box" id="originalText" style="background:#f5f5f5;border-color:#ddd"></div>
+            </div>
+            <div>
+              <div class="compare-label">&#x2728; 润色后</div>
+              <div class="preview-box opt-box" id="polishedText"></div>
+            </div>
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:#999" id="polishStats"></div>
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="copyPolish()">&#x1F4CB; 复制润色结果</button>
+            <button class="btn btn-outline" onclick="doPolish()">&#x1F504; 重新润色</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =============================================
+// ===== Complete JavaScript Implementation =====
+// =============================================
+
+var SENSITIVE_RULES = [
+  {pattern:/国[酒家]|第一[好酒]|最好|唯一|顶级|国家级|最[大强好棒]|第一/g,level:'high',category:'politics',label:'违规夸大',suggest:'避免使用"最""第一""国"等绝对化用语，涉嫌违反广告法'},
+  {pattern:/政治|宗教|民族|分裂|台独|港独|疆独|藏独|占中|法轮功|邪教/g,level:'high',category:'politics',label:'政治敏感',suggest:'涉及政治敏感内容，请删除相关内容'},
+  {pattern:/不转不是中国人|不点赞不是中国人|不分享不是|不转后悔/g,level:'high',category:'clickbait',label:'道德绑架',suggest:'不得使用胁迫、诅咒性言语诱导分享'},
+  {pattern:/寂寞[的哥妹姐]|约[炮啪]|裸[聊体照]|色情|情色|AV|三级[片级]|成人[片电影]|一夜情|约炮|勾搭|求包养/g,level:'high',category:'sexual',label:'色情低俗',suggest:'删除色情低俗内容，不得含有性暗示、性挑逗'},
+  {pattern:/性感|火辣|魔鬼身材|诱惑|挑逗|撩人/g,level:'medium',category:'sexual',label:'擦边内容',suggest:'避免使用性感挑逗类用语'},
+  {pattern:/死全家|全家死光|杀[人光]|打死|弄死|砍死|自残|自[杀焚]|跳楼|血腥|暴力|恐怖袭击/g,level:'high',category:'violence',label:'暴力恐怖',suggest:'涉及暴力、自残等内容，请删除并替换为正面表述'},
+  {pattern:/斗殴|打架|家暴|校园暴力|殴打/g,level:'high',category:'violence',label:'暴力内容',suggest:'不得展现暴力内容'},
+  {pattern:/包治百病|根治|神药|灵丹妙药|祖传秘方|宫廷秘方|一招见效|100%|百分百[有治成功有效]|永不复发|彻底治愈/g,level:'high',category:'misinfo',label:'虚假夸大',suggest:'不得使用医疗效果承诺类绝对化用语'},
+  {pattern:/震惊|惊呆了|出大事了|紧急通知|疯传|全网疯传|瞒不住了|紧急预警/g,level:'medium',category:'clickbait',label:'标题党',suggest:'避免使用夸张震惊类标题'},
+  {pattern:/吃了[这那]个[就都]|减肥[秘方神器]|三天[瘦减]|一周瘦|月入[十万百万千万]|轻松[月年]入[十万百万千万]/g,level:'medium',category:'misinfo',label:'虚假宣传',suggest:'不得发布虚假夸大的减肥、赚钱等内容'},
+  {pattern:/集[赞满]|邀请好友[拆助力]|分享可[以能]|转发[即就]可|点赞[抽送领]|评论[抽送领]|关注[抽送领]/g,level:'medium',category:'other',label:'诱导行为',suggest:'不得以奖励诱导用户分享、关注、点赞'},
+  {pattern:/求关注|求点赞|求转发|求扩散|关注我|点赞我/g,level:'low',category:'other',label:'诱导关注',suggest:'减少直接索要关注行为'},
+  {pattern:/未成年[人人妻]|童养媳|早婚|童婚/g,level:'high',category:'other',label:'未成年人不良',suggest:'不得涉及影响未成年人身心健康的内容'},
+  {pattern:/身份证[号码]|手机号[码]|微信号[码]|住址|家庭住址|银行卡[号密码]|验证码|密码|账号密码/g,level:'high',category:'other',label:'隐私泄露',suggest:'不得发布他人个人隐私信息'},
+  {pattern:/排毒|以形补形|食物相克|[某]穴位[治能]|刮痧[治能]|拔罐[治能]/g,level:'medium',category:'misinfo',label:'不科学医疗',suggest:'避免发布无科学依据的医疗健康内容'},
+  {pattern:/加[我微]信[号聊]|微信[号聊]|私信[我聊]|扫码[加进]|添加[微好]/g,level:'medium',category:'other',label:'诱导引流',suggest:'不得在内容中直接引导添加个人联系方式'},
+  {pattern:/风水|运势|算命|看相|卜卦|占卜|开光|转运[珠符]|化解|驱鬼|招财[猫除外]|旺财[猫除外]/g,level:'medium',category:'misinfo',label:'封建迷信',suggest:'避免宣扬封建迷信内容'},
+  {pattern:/炫富|挥金如土|钱多到|开[飞机游艇]买[飞机游艇兰博基尼]|扔钱|撒钱/g,level:'medium',category:'other',label:'炫富内容',suggest:'避免夸张炫富内容'},
+  {pattern:/效果[惊震]人|结果[惊震]人|原因[惊震]人|真相[惊震]人/g,level:'low',category:'clickbait',label:'标题党',suggest:'避免使用夸大性描述'}
+];
+
+var currentUser = null;
+
+function showToast(msg, duration) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show';
+  t.style.display = 'block';
+  setTimeout(function(){ t.className = 'toast'; t.style.display = 'none'; }, duration || 2500);
+}
+
+function switchTab(idx) {
+  var contents = document.querySelectorAll('.tab-content');
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < contents.length; i++) {
+    contents[i].classList.toggle('active', i === idx);
+    tabs[i].classList.toggle('active', i === idx);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener('click', function(){
+      switchTab(parseInt(this.getAttribute('data-tab')));
+    });
+  }
+  var ta = document.getElementById('content');
+  ta.addEventListener('input', function(){
+    document.getElementById('count').textContent = ta.value.length + ' 字符';
+  });
+  loadApiConfig();
+});
+
+function doLogin() {
+  currentUser = { name: '视频号用户_' + Math.random().toString(36).substring(2, 6) };
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('userBar').style.display = 'flex';
+  document.getElementById('userName').textContent = currentUser.name;
+  showToast('✅ 登录成功！欢迎 ' + currentUser.name);
+}
+
+function logout() {
+  currentUser = null;
+  document.getElementById('loginScreen').style.display = 'block';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('userBar').style.display = 'none';
+  showToast('已退出登录');
+}
+
+function clearContent() {
+  document.getElementById('content').value = '';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('count').textContent = '0 字符';
+}
+function doReview() {
+  var text = document.getElementById('content').value.trim();
+  if (!text) { showToast('⚠️ 请先输入脚本文本'); return; }
+  var btn = document.getElementById('reviewBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> 审核中...';
+  setTimeout(function(){
+    var result = reviewText(text);
+    renderReviewResult(result);
+    btn.disabled = false;
+    btn.innerHTML = '🔍 开始审核';
+  }, 500);
+}
+
+function reviewText(text) {
+  var found = [];
+  for (var ri = 0; ri < SENSITIVE_RULES.length; ri++) {
+    var rule = SENSITIVE_RULES[ri];
+    rule.pattern.lastIndex = 0;
+    var m;
+    while ((m = rule.pattern.exec(text)) !== null) {
+      found.push({ word: m[0], index: m.index, level: rule.level, category: rule.category, label: rule.label, suggest: rule.suggest });
+    }
+  }
+  found = found.filter(function(item, pos, self){
+    return self.findIndex(function(i){ return i.index === item.index && i.word === item.word; }) === pos;
+  });
+  found.sort(function(a,b){ return a.index - b.index; });
+
+  var seenSuggest = {};
+  var suggestions = [];
+  for (var fi = 0; fi < found.length; fi++) {
+    if (!seenSuggest[found[fi].suggest]) {
+      seenSuggest[found[fi].suggest] = true;
+      suggestions.push(found[fi].suggest);
+    }
+  }
+
+  var highCount = found.filter(function(f){ return f.level === 'high'; }).length;
+  var mediumCount = found.filter(function(f){ return f.level === 'medium'; }).length;
+  var lowCount = found.filter(function(f){ return f.level === 'low'; }).length;
+  var score = Math.max(0, Math.min(100, 100 - highCount * 15 - mediumCount * 8 - lowCount * 3));
+
+  var assessment = score >= 90 ? '✅ 脚本质量较好，未发现明显违规内容' : (score >= 70 ? '⚠️ 脚本存在部分问题，建议修改后发布' : '❌ 脚本存在较多违规风险，强烈建议修改');
+
+  var extraSuggestions = [];
+  if (text.length < 100) extraSuggestions.push('内容过短，建议丰富脚本细节');
+  if (text.length > 1500) extraSuggestions.push('内容较长，建议精简核心信息，控制在800字以内');
+  if (text.indexOf('?') === -1 && text.indexOf('？') === -1 && text.length > 100) extraSuggestions.push('缺少设问互动，建议在关键节点加入问题引导观众思考');
+
+  return { score: score, found: found, suggestions: suggestions, extraSuggestions: extraSuggestions, assessment: assessment, highCount: highCount, mediumCount: mediumCount, lowCount: lowCount, text: text };
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderReviewResult(result) {
+  var container = document.getElementById('results');
+  container.style.display = 'block';
+  var html = '';
+  var scoreClass = result.score >= 80 ? 'good' : (result.score >= 60 ? 'ok' : 'bad');
+  html += '<div class="card"><div class="title">📊 审核评分</div>';
+  html += '<div class="score-bar"><span class="label">健康度</span><div class="track"><div class="fill ' + scoreClass + '" style="width:' + result.score + '%"></div></div><span class="num">' + result.score + '</span></div>';
+  html += '<div style="font-size:13px;color:#666;margin-top:6px">' + result.assessment + '</div>';
+  html += '<div style="font-size:12px;color:#999;margin-top:4px;display:flex;gap:12px">';
+  html += '<span style="color:#fa5151">⚠️ 高危 ' + result.highCount + '</span>';
+  html += '<span style="color:#fa9a3b">⚠️ 中危 ' + result.mediumCount + '</span>';
+  html += '<span style="color:#5865f2">⚠️ 低危 ' + result.lowCount + '</span>';
+  html += '</div></div>';
+
+  if (result.found.length > 0) {
+    html += '<div class="card"><div class="title">🚨 违规标记 <span style="font-size:12px;font-weight:400;color:#999">共 ' + result.found.length + ' 处</span></div>';
+    html += '<div class="preview-box" style="max-height:250px">';
+    var highlighted = result.text;
+    var sorted = result.found.slice().sort(function(a,b){ return b.index - a.index; });
+    for (var si = 0; si < sorted.length; si++) {
+      var tag = '<span class="tag">' + escapeHtml(sorted[si].word) + '</span>';
+      highlighted = highlighted.substring(0, sorted[si].index) + tag + highlighted.substring(sorted[si].index + sorted[si].word.length);
+    }
+    html += highlighted;
+    html += '</div></div>';
+
+    html += '<div class="card"><div class="title">📋 违规详情</div>';
+    for (var fi = 0; fi < result.found.length; fi++) {
+      var item = result.found[fi];
+      var levelLabel = item.level === 'high' ? '高危' : (item.level === 'medium' ? '中危' : '低危');
+      html += '<div class="result-item ' + item.level + '">';
+      html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+      html += '<strong>"' + escapeHtml(item.word) + '"</strong>';
+      html += '<span class="category-tag ' + item.category + '">' + item.label + '</span>';
+      html += '<span style="font-size:11px;color:#999">[' + levelLabel + ']</span></div>';
+      html += '<div style="font-size:12px;color:#07c160;margin-top:4px">💡 ' + item.suggest + '</div></div>';
+    }
+    html += '</div>';
+  }
+
+  var allSuggestions = result.suggestions.concat(result.extraSuggestions);
+  if (allSuggestions.length > 0) {
+    html += '<div class="card"><div class="title">💡 优化建议</div>';
+    for (var si2 = 0; si2 < allSuggestions.length; si2++) {
+      html += '<div class="suggest-item"><div class="suggest-num">' + (si2+1) + '</div><div><div>' + allSuggestions[si2] + '</div></div></div>';
+    }
+    html += '</div>';
+  }
+
+  var optimized = result.text;
+  var sSorted = result.found.slice().sort(function(a,b){ return b.index - a.index; });
+  var replMap = { '死全家':'请支持','全家死光':'请支持','不转不是中国人':'请分享支持','不点赞不是中国人':'请点赞支持','求关注':'欢迎关注','求点赞':'如果喜欢请点赞','求转发':'欢迎转发分享','震惊':'值得关注','惊呆了':'让人惊讶','出大事了':'重要消息','紧急通知':'重要提醒','疯了':'太棒了','包治百病':'有益健康','根治':'改善','神药':'好产品','灵丹妙药':'好产品','祖传秘方':'传统方法','宫廷秘方':'传统配方','一招见效':'有效方法','100%':'很高','百分百有效':'效果显著','永不复发':'长期稳定','彻底治愈':'明显改善','三天瘦':'科学瘦身','一周瘦':'健康瘦身','月入十万':'收入可观','月入百万':'收入可观','轻松月入':'努力实现' };
+  for (var si3 = 0; si3 < sSorted.length; si3++) {
+    var w = sSorted[si3].word;
+    var rep = replMap[w];
+    if (rep) {
+      optimized = optimized.substring(0, sSorted[si3].index) + rep + optimized.substring(sSorted[si3].index + w.length);
+    }
+  }
+
+  html += '<div class="card"><div class="title">📝 生成优化脚本</div>';
+  html += '<div class="opt-box" id="optimizedScript">' + escapeHtml(optimized) + '</div>';
+  html += '<div class="btn-group">';
+  html += '<button class="btn btn-primary" onclick="copyOptimized()">📋 复制优化脚本</button>';
+  html += '<button class="btn btn-outline" onclick="sendToPolish()">✨ 发送到AI润色</button>';
+  html += '</div></div>';
+
+  container.innerHTML = html;
+}
+
+function copyOptimized() {
+  var el = document.getElementById('optimizedScript');
+  if (el) copyText(el.textContent);
+}
+
+function copyPolish() {
+  var el = document.getElementById('polishedText');
+  if (el) copyText(el.textContent);
+}
+
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){ showToast('✅ 已复制到剪贴板'); }).catch(function(){ fallbackCopy(text); });
+  } else { fallbackCopy(text); }
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); showToast('✅ 已复制到剪贴板'); } catch(e) { showToast('⚠️ 复制失败，请手动复制'); }
+  document.body.removeChild(ta);
+}
+function sendToPolish() {
+  var el = document.getElementById('optimizedScript');
+  if (el) { document.getElementById('polishInput').value = el.textContent; switchTab(1); showToast('✅ 已导入到润色区'); }
+}
+
+function importFromReview() {
+  var content = document.getElementById('content').value;
+  if (!content) { showToast('⚠️ 审核区暂无内容'); return; }
+  document.getElementById('polishInput').value = content;
+  showToast('✅ 已导入审核区内容');
+}
+
+function selectMode(el) {
+  var modes = document.querySelectorAll('.polish-mode');
+  for (var i = 0; i < modes.length; i++) modes[i].classList.remove('active');
+  el.classList.add('active');
+}
+
+function toggleModelCustom() {
+  var sel = document.getElementById('apiModel');
+  document.getElementById('apiModelCustom').style.display = sel.value === '' ? 'block' : 'none';
+}
+
+function saveApiConfig() {
+  var sel = document.getElementById('apiModel');
+  var config = {
+    url: document.getElementById('apiUrl').value.trim(),
+    key: document.getElementById('apiKey').value.trim(),
+    model: sel.value || document.getElementById('apiModelCustom').value.trim(),
+    prompt: document.getElementById('apiPrompt').value.trim()
+  };
+  if (!config.url) { showToast('⚠️ 请输入API地址'); return; }
+  if (!config.key) { showToast('⚠️ 请输入API Key'); return; }
+  if (!config.model) { showToast('⚠️ 请选择或输入模型名称'); return; }
+  localStorage.setItem('ai_config', JSON.stringify(config));
+  updateApiStatus(true);
+  showToast('✅ AI配置已保存');
+}
+
+function loadApiConfig() {
+  try {
+    var saved = localStorage.getItem('ai_config');
+    if (!saved) return false;
+    var config = JSON.parse(saved);
+    document.getElementById('apiUrl').value = config.url || '';
+    document.getElementById('apiKey').value = config.key || '';
+    var sel = document.getElementById('apiModel');
+    var custom = document.getElementById('apiModelCustom');
+    var found = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === config.model) { sel.value = config.model; custom.style.display = 'none'; found = true; break; }
+    }
+    if (!found) { sel.value = ''; custom.value = config.model; custom.style.display = 'block'; }
+    if (config.prompt) document.getElementById('apiPrompt').value = config.prompt;
+    updateApiStatus(true);
+    return true;
+  } catch(e) { return false; }
+}
+
+function updateApiStatus(configured) {
+  if (configured) {
+    document.getElementById('apiStatus').innerHTML = '<span class="api-status on"></span>AI已配置';
+    document.getElementById('apiDot').innerHTML = '<span class="api-status on"></span>';
+  } else {
+    document.getElementById('apiStatus').innerHTML = '<span class="api-status off"></span>未配置AI';
+    document.getElementById('apiDot').innerHTML = '<span class="api-status off"></span>';
+  }
+}
+
+function testApi() {
+  var config = getApiConfig();
+  if (!config) return;
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '测试中...';
+  fetch(config.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.key },
+    body: JSON.stringify({ model: config.model, messages: [{role:'user', content:'回复"ok"表示连接正常'}], max_tokens: 10 })
+  })
+  .then(function(rsp){
+    if (!rsp.ok) throw new Error('HTTP ' + rsp.status);
+    return rsp.json();
+  })
+  .then(function(){
+    showToast('✅ 连接成功！API响应正常');
+    saveApiConfig();
+  })
+  .catch(function(err){
+    showToast('❌ 连接失败: ' + err.message);
+  })
+  .finally(function(){
+    btn.disabled = false;
+    btn.textContent = '🔌 测试连接';
+  });
+}
+
+function getApiConfig() {
+  var url = document.getElementById('apiUrl').value.trim();
+  var key = document.getElementById('apiKey').value.trim();
+  var model = document.getElementById('apiModel').value || document.getElementById('apiModelCustom').value.trim();
+  var prompt = document.getElementById('apiPrompt').value.trim();
+  if (!url) { showToast('⚠️ 请先配置API地址'); return null; }
+  if (!key) { showToast('⚠️ 请先配置API Key'); return null; }
+  if (!model) { showToast('⚠️ 请选择模型'); return null; }
+  try { var saved = JSON.parse(localStorage.getItem('ai_config')); if (saved && saved.prompt && !prompt) prompt = saved.prompt; } catch(e){}
+  if (!prompt) prompt = document.getElementById('apiPrompt').value.trim();
+  return { url: url, key: key, model: model, prompt: prompt };
+}
+
+function doPolish() {
+  var text = document.getElementById('polishInput').value.trim();
+  if (!text) { showToast('⚠️ 请输入需要润色的文本'); return; }
+  var config = getApiConfig();
+  if (!config) return;
+  var btn = document.getElementById('polishBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> AI润色中...';
+  var activeMode = document.querySelector('.polish-mode.active');
+  var modeName = activeMode ? activeMode.textContent.trim() : '正式';
+
+  function callAPI() {
+    var messages = [
+      {role: 'system', content: config.prompt},
+      {role: 'user', content: '请用【' + modeName + '】的风格润色以下内容：\n\n' + text}
+    ];
+    fetch(config.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.key },
+      body: JSON.stringify({ model: config.model, messages: messages, max_tokens: 2048, temperature: 0.7 })
+    })
+    .then(function(rsp){
+      if (rsp.status === 401 || rsp.status === 403) throw new Error('认证失败，请检查API Key');
+      if (rsp.status === 429) throw new Error('请求过于频繁，请稍后再试');
+      if (!rsp.ok) throw new Error('HTTP ' + rsp.status);
+      return rsp.json();
+    })
+    .then(function(data){
+      var result = '';
+      if (data.choices && data.choices.length > 0) result = data.choices[0].message.content;
+      else if (data.choices && data.choices[0].text) result = data.choices[0].text;
+      else result = JSON.stringify(data);
+      renderPolishResult(text, result, modeName);
+      showToast('✅ 润色完成！');
+    })
+    .catch(function(err){
+      showToast('❌ 润色失败: ' + err.message);
+    })
+    .finally(function(){
+      btn.disabled = false;
+      btn.innerHTML = '✨ AI 润色';
+    });
+  }
+  callAPI();
+}
+
+function renderPolishResult(original, polished, modeName) {
+  var container = document.getElementById('polishResults');
+  container.style.display = 'block';
+  document.getElementById('originalText').textContent = original;
+  document.getElementById('polishedText').textContent = polished;
+  var origLen = original.length;
+  var polishedLen = polished.length;
+  var changeRate = ((polishedLen - origLen) / origLen * 100).toFixed(1);
+  var stats = '原文 ' + origLen + ' 字 → 润色后 ' + polishedLen + ' 字';
+  if (changeRate > 0) stats += '（增加了 ' + changeRate + '%）';
+  else if (changeRate < 0) stats += '（精简了 ' + Math.abs(changeRate) + '%）';
+  else stats += '（字数不变）';
+  stats += ' · 润色模式: ' + modeName;
+  document.getElementById('polishStats').textContent = stats;
+  container.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function resetPrompt() {
+  document.getElementById('apiPrompt').value = '你是一个专业的视频号脚本优化助手。请对用户提供的视频脚本进行润色优化，要求：1. 保留原意和信息完整性；2. 优化表达使其更吸引人、更流畅；3. 避免标题党、虚假夸大等违规内容；4. 适合短视频口播风格。请直接输出优化后的完整脚本，不要添加解释。';
+  showToast('✅ 已恢复默认提示词');
+}
+</script>
+</body>
+</html>
