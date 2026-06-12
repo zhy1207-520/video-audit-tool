@@ -93,7 +93,7 @@ textarea:focus{border-color:#07c160}
 <body>
 <div class="header">
   &#x1F4F1; 视频号脚本审核 + AI 润色
-  <span class="sub" id="apiStatus"><span class="api-status on"></span>DeepSeek 已接入</span>
+  <span class="sub" id="apiStatus"><span class="api-status on"></span>ARK 已接入</span>
 </div>
 
 <div id="userBar" class="user-bar" style="display:none">
@@ -136,18 +136,18 @@ textarea:focus{border-color:#07c160}
 
     <div class="tab-content" id="tab1">
       <details class="api-config" id="apiConfig">
-        <summary><span id="apiDot"><span class="api-status on"></span></span> AI 接口配置 <span style="font-weight:400;color:#999;font-size:12px">（支持 OpenAI / DeepSeek / 通义千问 等兼容接口）</span></summary>
+        <summary><span id="apiDot"><span class="api-status on"></span></span> AI 接口配置 <span style="font-weight:400;color:#999;font-size:12px">（支持 OpenAI / ARK / 通义千问 等兼容接口）</span></summary>
         <label>API 地址</label>
-        <input id="apiUrl" value="https://api.deepseek.com/v1/chat/completions">
+        <input id="apiUrl" value="https://ark.cn-beijing.volces.com/api/v3/chat/completions">
         <label>API Key</label>
-        <input id="apiKey" type="password" value="sk-df99ce5a57dd4921b101e69db8e6f163">
+        <input id="apiKey" type="password" value="ark-1ea71df0-e122-41c4-88c2-15cab08512d5-1809f">
         <label>模型名称</label>
         <select id="apiModel" onchange="toggleModelCustom()">
           <option value="">自定义输入</option>
           <option value="gpt-4o-mini">GPT-4o-mini</option>
           <option value="gpt-4o">GPT-4o</option>
           <option value="deepseek-chat">DeepSeek Chat</option>
-          <option value="deepseek-v4-pro" selected>DeepSeek V4 Pro</option>
+          <option value="deepseek-v4-pro" selected>ARK (自定义模型)</option>
           <option value="deepseek-reasoner">DeepSeek Reasoner</option>
           <option value="qwen-plus">通义千问 Plus</option>
         </select>
@@ -243,8 +243,8 @@ function getApiFetchUrl(baseUrl) {
 }
 
 var DEEPSEEK_DEFAULT = {
-  url: 'https://api.deepseek.com/v1/chat/completions',
-  key: 'sk-df99ce5a57dd4921b101e69db8e6f163',
+  url: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+  key: 'ark-1ea71df0-e122-41c4-88c2-15cab08512d5-1809f',
   model: 'deepseek-v4-pro'
 };
 
@@ -536,7 +536,7 @@ function updateApiStatus(configured) {
     document.getElementById('apiStatus').innerHTML = '<span class="api-status on"></span>AI已配置';
     document.getElementById('apiDot').innerHTML = '<span class="api-status on"></span>';
   } else {
-    document.getElementById('apiStatus').innerHTML = '<span class="api-status on"></span>DeepSeek 已接入';
+    document.getElementById('apiStatus').innerHTML = '<span class="api-status on"></span>ARK 已接入';
     document.getElementById('apiDot').innerHTML = '<span class="api-status off"></span>';
   }
 }
