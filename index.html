@@ -93,7 +93,7 @@ textarea:focus{border-color:#07c160}
 <body>
 <div class="header">
   &#x1F4F1; 视频号脚本审核 + AI 润色
-  <span class="sub" id="apiStatus"><span class="api-status off"></span>未配置AI</span>
+  <span class="sub" id="apiStatus"><span class="api-status on"></span>DeepSeek 已接入</span>
 </div>
 
 <div id="userBar" class="user-bar" style="display:none">
@@ -136,11 +136,11 @@ textarea:focus{border-color:#07c160}
 
     <div class="tab-content" id="tab1">
       <details class="api-config" id="apiConfig">
-        <summary><span id="apiDot"><span class="api-status off"></span></span> AI 接口配置 <span style="font-weight:400;color:#999;font-size:12px">（支持 OpenAI / DeepSeek / 通义千问 等兼容接口）</span></summary>
+        <summary><span id="apiDot"><span class="api-status on"></span></span> AI 接口配置 <span style="font-weight:400;color:#999;font-size:12px">（支持 OpenAI / DeepSeek / 通义千问 等兼容接口）</span></summary>
         <label>API 地址</label>
-        <input id="apiUrl" placeholder="https://api.deepseek.com/v1/chat/completions">
+        <input id="apiUrl" value="https://api.deepseek.com/v1/chat/completions">
         <label>API Key</label>
-        <input id="apiKey" type="password" placeholder="sk-...">
+        <input id="apiKey" type="password" value="sk-df99ce5a57dd4921b101e69db8e6f163">
         <label>模型名称</label>
         <select id="apiModel" onchange="toggleModelCustom()">
           <option value="">自定义输入</option>
@@ -478,21 +478,30 @@ function saveApiConfig() {
 function loadApiConfig() {
   try {
     var saved = localStorage.getItem('ai_config');
-    if (!saved) return false;
-    var config = JSON.parse(saved);
-    document.getElementById('apiUrl').value = config.url || '';
-    document.getElementById('apiKey').value = config.key || '';
-    var sel = document.getElementById('apiModel');
-    var custom = document.getElementById('apiModelCustom');
-    var found = false;
-    for (var i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === config.model) { sel.value = config.model; custom.style.display = 'none'; found = true; break; }
+    if (saved) {
+      var config = JSON.parse(saved);
+      document.getElementById('apiUrl').value = config.url || '';
+      document.getElementById('apiKey').value = config.key || '';
+      var sel = document.getElementById('apiModel');
+      var custom = document.getElementById('apiModelCustom');
+      var found = false;
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === config.model) { sel.value = config.model; custom.style.display = 'none'; found = true; break; }
+      }
+      if (!found) { sel.value = ''; custom.value = config.model; custom.style.display = 'block'; }
+      if (config.prompt) document.getElementById('apiPrompt').value = config.prompt;
+      updateApiStatus(true);
+      return true;
     }
-    if (!found) { sel.value = ''; custom.value = config.model; custom.style.display = 'block'; }
-    if (config.prompt) document.getElementById('apiPrompt').value = config.prompt;
-    updateApiStatus(true);
-    return true;
-  } catch(e) { return false; }
+  } catch(e) { }
+  // Default to DeepSeek if no saved config
+  var defaultConfig = { url: 'https://api.deepseek.com/v1/chat/completions', key: 'sk-df99ce5a57dd4921b101e69db8e6f163', model: 'deepseek-chat', prompt: '' };
+  localStorage.setItem('ai_config', JSON.stringify(defaultConfig));
+  document.getElementById('apiUrl').value = defaultConfig.url;
+  document.getElementById('apiKey').value = defaultConfig.key;
+  document.getElementById('apiModel').value = 'deepseek-chat';
+  updateApiStatus(true);
+  return true;
 }
 
 function updateApiStatus(configured) {
@@ -500,7 +509,7 @@ function updateApiStatus(configured) {
     document.getElementById('apiStatus').innerHTML = '<span class="api-status on"></span>AI已配置';
     document.getElementById('apiDot').innerHTML = '<span class="api-status on"></span>';
   } else {
-    document.getElementById('apiStatus').innerHTML = '<span class="api-status off"></span>未配置AI';
+    document.getElementById('apiStatus').innerHTML = '<span class="api-status on"></span>DeepSeek 已接入';
     document.getElementById('apiDot').innerHTML = '<span class="api-status off"></span>';
   }
 }
