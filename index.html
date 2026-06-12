@@ -146,7 +146,8 @@ textarea:focus{border-color:#07c160}
           <option value="">自定义输入</option>
           <option value="gpt-4o-mini">GPT-4o-mini</option>
           <option value="gpt-4o">GPT-4o</option>
-          <option value="deepseek-chat" selected>DeepSeek Chat</option>
+          <option value="deepseek-chat">DeepSeek Chat</option>
+          <option value="deepseek-v4-pro" selected>DeepSeek V4 Pro</option>
           <option value="deepseek-reasoner">DeepSeek Reasoner</option>
           <option value="qwen-plus">通义千问 Plus</option>
         </select>
@@ -234,7 +235,7 @@ var currentUser = null;
 var DEEPSEEK_DEFAULT = {
   url: 'https://api.deepseek.com/v1/chat/completions',
   key: 'sk-df99ce5a57dd4921b101e69db8e6f163',
-  model: 'deepseek-chat'
+  model: 'deepseek-v4-pro'
 };
 
 function showToast(msg, duration) {
@@ -295,13 +296,22 @@ function doReview() {
   if (!text) { showToast('⚠️ 请先输入脚本文本'); return; }
   var btn = document.getElementById('reviewBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="loading"></span> 审核中...';
+  btn.innerHTML = '<span class="loading"></span> 本地规则审核中...';
+  
+  // Step 1: Local regex review (fast, always runs)
   setTimeout(function(){
-    var result = reviewText(text);
-    renderReviewResult(result);
+    var localResult = reviewText(text);
+    renderReviewResult(localResult);
+    btn.innerHTML = '<span class="loading"></span> AI 深度审核中...';
+    
+    // Step 2: AI-powered review (if API configured)
+    var apiConfig = getApiConfigSilent();
+    if (apiConfig) {
+      doAIScriptReview(text, localResult);
+    }
     btn.disabled = false;
     btn.innerHTML = '🔍 开始审核';
-  }, 500);
+  }, 300);
 }
 
 function reviewText(text) {
@@ -521,6 +531,112 @@ function updateApiStatus(configured) {
   }
 }
 
+function doAIScriptReview(text, localResult) {
+  var config = getApiConfigSilent();
+  if (!config) return;
+  
+  var reviewPrompt = '你是一个专业的微信视频号内容审核专家。请根据《微信视频号运营规范》对以下视频脚本文案进行深度审核。\n\n审核要求：\n1. 检查政治敏感内容（违反宪法、危害国家安全、分裂国家等）\n2. 检查色情低俗内容（性暗示、裸露、低俗用语等）\n3. 检查暴力恐怖内容（血腥、暴力、自残、恐怖袭击等）\n4. 检查虚假夸大宣传（绝对化用语、虚假医疗、夸大效果等）\n5. 检查标题党/诱导行为（夸张标题、诱导分享、道德绑架等）\n6. 检查隐私侵权（泄露个人信息、侵犯肖像权等）\n7. 检查封建迷信内容\n8. 检查医疗违规内容\n9. 检查低质内容（内容过短、重复、拼凑等）\n10. 检查未成年人保护相关内容\n\n请输出严格的JSON格式（不要添加任何其他文字）：\n{"violations":[{"type":"违规类型","content":"违规的具体内容","severity":"high/medium/low","suggestion":"修改建议"}],"score":85,"summary":"总体评价","improvements":["优化建议1","优化建议2"]}\n\n如果没有违规，violations数组为空，score为100。\n\n需要审核的内容：\n' + text;
+  
+  var btn = document.getElementById('reviewBtn');
+  btn.innerHTML = '<span class="loading"></span> AI 深度审核中...';
+  
+  fetch(config.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.key },
+    body: JSON.stringify({ model: config.model || DEEPSEEK_DEFAULT.model, messages: [{role:'user', content: reviewPrompt}], max_tokens: 2048, temperature: 0.1 })
+  })
+  .then(function(rsp){
+    if (!rsp.ok) throw new Error('HTTP ' + rsp.status);
+    return rsp.json();
+  })
+  .then(function(data){
+    var aiText = '';
+    if (data.choices && data.choices.length > 0) aiText = data.choices[0].message.content;
+    else if (data.choices && data.choices[0].text) aiText = data.choices[0].text;
+    else aiText = JSON.stringify(data);
+    
+    var aiResult = null;
+    try {
+      aiResult = JSON.parse(aiText);
+    } catch(e) {
+      // Try extracting JSON from markdown code blocks
+      var jsonMatch = aiText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try { aiResult = JSON.parse(jsonMatch[0]); } catch(e2) {}
+      }
+    }
+    
+    if (aiResult) {
+      renderAIReviewResult(aiResult, localResult);
+    } else {
+      showToast('⚠️ AI 审核结果解析失败，请重试');
+    }
+  })
+  .catch(function(err){
+    showToast('⚠️ AI 深度审核失败: ' + err.message + '（本地审核已完成）');
+  });
+}
+
+function renderAIReviewResult(aiResult, localResult) {
+  var container = document.getElementById('results');
+  if (!container) return;
+  
+  // Remove existing AI section if any
+  var oldAI = document.getElementById('aiReviewSection');
+  if (oldAI) oldAI.remove();
+  
+  var aiScore = aiResult.score !== undefined ? aiResult.score : 85;
+  var violations = aiResult.violations || [];
+  var improvements = aiResult.improvements || [];
+  var summary = aiResult.summary || '';
+  
+  var scoreClass = aiScore >= 80 ? 'good' : (aiScore >= 60 ? 'ok' : 'bad');
+  
+  var html = '<div id="aiReviewSection" style="margin-top:8px">';
+  
+  // Combined score
+  html += '<div class="card" style="border:2px solid #5865f2">';
+  html += '<div class="title" style="color:#5865f2">🤖 AI 深度审核</div>';
+  html += '<div class="score-bar"><span class="label">AI评分</span><div class="track"><div class="fill ' + scoreClass + '" style="width:' + aiScore + '%"></div></div><span class="num">' + aiScore + '</span></div>';
+  if (summary) html += '<div style="font-size:13px;color:#666;margin-top:6px">📋 ' + summary + '</div>';
+  
+  if (violations.length > 0) {
+    html += '<div style="margin-top:10px"><strong>🚨 AI 检测到的违规</strong></div>';
+    for (var i = 0; i < violations.length; i++) {
+      var v = violations[i];
+      var levelClass = v.severity === 'high' ? 'high' : (v.severity === 'medium' ? 'medium' : 'low');
+      html += '<div class="result-item ' + levelClass + '" style="margin-top:6px">';
+      html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+      html += '<strong>' + escapeHtml(v.type || '违规') + '</strong>';
+      html += '</div>';
+      if (v.content) html += '<div style="font-size:12px;color:#333;margin-top:2px">内容: ' + escapeHtml(v.content) + '</div>';
+      if (v.suggestion) html += '<div style="font-size:12px;color:#5865f2;margin-top:2px">💡 ' + escapeHtml(v.suggestion) + '</div>';
+      html += '</div>';
+    }
+  } else {
+    html += '<div style="font-size:13px;color:#07c160;margin-top:8px">✅ AI 审核未发现违规内容</div>';
+  }
+  
+  if (improvements.length > 0) {
+    html += '<div style="margin-top:10px"><strong>💡 AI 优化建议</strong></div>';
+    for (var j = 0; j < improvements.length; j++) {
+      html += '<div class="suggest-item"><div class="suggest-num">' + (j+1) + '</div><div><div>' + escapeHtml(improvements[j]) + '</div></div></div>';
+    }
+  }
+  
+  html += '</div></div>';
+  
+  container.insertAdjacentHTML('beforeend', html);
+  
+  // Highlight AI model used
+  var config = getApiConfigSilent();
+  if (config) {
+    showToast('🤖 AI 深度审核完成（模型: ' + (config.model || 'deepseek-v4-pro') + '）', 3000);
+  }
+  
+  // Scroll to show AI results
+  document.getElementById('aiReviewSection').scrollIntoView({behavior:'smooth', block:'center'});
+}
 function testApi() {
   var config = getApiConfig();
   if (!config) return;
@@ -552,6 +668,16 @@ function testApi() {
   });
 }
 
+function getApiConfigSilent() {
+  var url = document.getElementById('apiUrl').value.trim() || DEEPSEEK_DEFAULT.url;
+  var key = document.getElementById('apiKey').value.trim() || DEEPSEEK_DEFAULT.key;
+  var model = document.getElementById('apiModel').value || document.getElementById('apiModelCustom').value.trim() || DEEPSEEK_DEFAULT.model;
+  if (!url || !key || !model) return null;
+  var prompt = document.getElementById('apiPrompt').value.trim();
+  try { var saved = JSON.parse(localStorage.getItem('ai_config')); if (saved && saved.prompt && !prompt) prompt = saved.prompt; } catch(e){}
+  if (!prompt) prompt = document.getElementById('apiPrompt').value.trim();
+  return { url: url, key: key, model: model, prompt: prompt };
+}
 function getApiConfig() {
   var url = document.getElementById('apiUrl').value.trim();
   var key = document.getElementById('apiKey').value.trim();
